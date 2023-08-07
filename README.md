@@ -1,6 +1,7 @@
-﻿﻿# WATS Client Converter - TestStandXMLConverter
 
-A WATS Client converter plugin for importing TestStand XML files to WATS.
+# WATS Client Converter - ICTKeysight3050Importer
+  
+A WATS Client converter for importing test data from Medalist i3070 In-circuit Test System (Log Record Format) to WATS.
 
 This converter does not support WATS Client 5.1 or older, because that version uses .NET Framework 3.5, and this converter targets .NET Framework 4.6.2.
 
