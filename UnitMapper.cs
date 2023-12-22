@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Virinco.WATS.Interface.Models;
 
 namespace ICTKeysight3070Converter
 {
@@ -75,7 +76,7 @@ namespace ICTKeysight3070Converter
                 {"Z-M",    new TestResultInfo {     Prefix = "Z-M",     Purpose = "impedance test results",                    Unit = "Ω",  FullUnitName = "Ohms",      Multiplier = 1}},
             };
         }
-        static public (double, string) GetMultiplierAndUnitHardcoded(string prefix, double value)
+        static public (double, string) GetMultiplierAndUnitHardcoded(string prefix)
         {
             if (map.TryGetValue(prefix, out TestResultInfo info))
             {
@@ -105,31 +106,26 @@ namespace ICTKeysight3070Converter
             }
         }
 
+
         public static (double, string) ConvertToEngineeringNotation(double value, string unit)
         {
-            string[] unitPrefixes = { "p", "n", "µ", "m", "", "k", "M", "G", "T" };
-            int unitIndex = 4; // Start from base unit
-            double multiplier = 1.0;
+            var exponentToPrefix = new Dictionary<int, string> { { -15, "f" }, { -12, "p" }, { -9, "n" }, { -6, "µ" }, { -3, "m" }, { 0, "" }, { 3, "k" }, { 6, "M" }, { 9, "G" }, { 12, "T" }, { 15, "P" } };
 
             double tempValue = Math.Abs(value);
+            double logValue = Math.Log10(tempValue);
+            int exponent = (int)Math.Floor(logValue);
+            int nearestMultipleOfThree = (int)(Math.Round(exponent / 3.0) * 3);
 
-            while (tempValue >= 1000 && unitIndex < unitPrefixes.Length - 1)
+            if (exponentToPrefix.TryGetValue(nearestMultipleOfThree, out string unitPrefix))
             {
-                tempValue /= 1000;
-                unitIndex++;
-                multiplier /= 1000;
+                double multiplier = Math.Pow(10, -nearestMultipleOfThree);
+                string fullUnit = unitPrefix + unit;
+                return (multiplier, fullUnit);
             }
-            while (tempValue < 1 && unitIndex > 0)
+            else
             {
-                tempValue *= 1000;
-                unitIndex--;
-                multiplier *= 1000;
+                return (1, unit);
             }
-
-            string unitPrefix = unitPrefixes[unitIndex];
-            string fullUnit = unitPrefix + unit;
-
-            return (multiplier, fullUnit);
         }
     }
 }

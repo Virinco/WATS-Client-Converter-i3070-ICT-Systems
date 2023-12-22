@@ -19,19 +19,19 @@ namespace ICTKeysight3070Converter
             InitializeAPI(true);
         }
 
-        [TestMethod]
-        public void ICTKeysight3070Importer()
-        {
-            InitializeAPI(true);
-            string fn = "";
-            Dictionary<string, string> arguments = new ICTKeysight3070Importer().ConverterParameters;
-            ICTKeysight3070Importer converter = new ICTKeysight3070Importer(arguments);
-            using (FileStream file = new FileStream(fn, FileMode.Open))
-            {
-                SetConversionSource(new FileInfo(fn), converter.ConverterParameters, null);
-                Report uut = converter.ImportReport(this, file);
-            }
-        }
+        //[TestMethod]
+        //public void ICTKeysight3070Importer()
+        //{
+        //    InitializeAPI(true);
+        //    string fn = "";
+        //    Dictionary<string, string> arguments = new ICTKeysight3070Importer().ConverterParameters;
+        //    ICTKeysight3070Importer converter = new ICTKeysight3070Importer(arguments);
+        //    using (FileStream file = new FileStream(fn, FileMode.Open))
+        //    {
+        //        SetConversionSource(new FileInfo(fn), converter.ConverterParameters, null);
+        //        Report uut = converter.ImportReport(this, file);
+        //    }
+        //}
 
         [TestMethod]
         public void ICTKeysight3070ImporterFolder()

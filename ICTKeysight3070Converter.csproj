@@ -42,22 +42,22 @@
     <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
     <Reference Include="Virinco.Newtonsoft.Json, Version=11.0.0.0, Culture=neutral, PublicKeyToken=dbc0e1bf149d1e88, processorArchitecture=MSIL">
-      <HintPath>packages\WATS.Client.6.1.91\lib\net472\Virinco.Newtonsoft.Json.dll</HintPath>
+      <HintPath>packages\WATS.Client.6.1.101\lib\net472\Virinco.Newtonsoft.Json.dll</HintPath>
     </Reference>
-    <Reference Include="Virinco.WATS.Converters.Standard, Version=6.1.0.91, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>packages\WATS.Client.6.1.91\lib\net472\Virinco.WATS.Converters.Standard.dll</HintPath>
+    <Reference Include="Virinco.WATS.Converters.Standard, Version=6.1.0.101, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>packages\WATS.Client.6.1.101\lib\net472\Virinco.WATS.Converters.Standard.dll</HintPath>
     </Reference>
-    <Reference Include="Virinco.WATS.Interface.MES, Version=6.1.0.91, Culture=neutral, PublicKeyToken=25abfe255fd31fdf, processorArchitecture=MSIL">
-      <HintPath>packages\WATS.Client.6.1.91\lib\net472\Virinco.WATS.Interface.MES.dll</HintPath>
+    <Reference Include="Virinco.WATS.Interface.MES, Version=6.1.0.101, Culture=neutral, PublicKeyToken=25abfe255fd31fdf, processorArchitecture=MSIL">
+      <HintPath>packages\WATS.Client.6.1.101\lib\net472\Virinco.WATS.Interface.MES.dll</HintPath>
     </Reference>
-    <Reference Include="Virinco.WATS.Interface.TDM, Version=6.1.0.91, Culture=neutral, PublicKeyToken=25abfe255fd31fdf, processorArchitecture=MSIL">
-      <HintPath>packages\WATS.Client.6.1.91\lib\net472\Virinco.WATS.Interface.TDM.dll</HintPath>
+    <Reference Include="Virinco.WATS.Interface.TDM, Version=6.1.0.101, Culture=neutral, PublicKeyToken=25abfe255fd31fdf, processorArchitecture=MSIL">
+      <HintPath>packages\WATS.Client.6.1.101\lib\net472\Virinco.WATS.Interface.TDM.dll</HintPath>
     </Reference>
-    <Reference Include="Virinco.WATS.Service.MES.Contract, Version=6.1.0.91, Culture=neutral, PublicKeyToken=3e36107bb2aa2c24, processorArchitecture=MSIL">
-      <HintPath>packages\WATS.Client.6.1.91\lib\net472\Virinco.WATS.Service.MES.Contract.dll</HintPath>
+    <Reference Include="Virinco.WATS.Service.MES.Contract, Version=6.1.0.101, Culture=neutral, PublicKeyToken=3e36107bb2aa2c24, processorArchitecture=MSIL">
+      <HintPath>packages\WATS.Client.6.1.101\lib\net472\Virinco.WATS.Service.MES.Contract.dll</HintPath>
     </Reference>
-    <Reference Include="Virinco.WATS.WATS-Core, Version=6.1.0.91, Culture=neutral, PublicKeyToken=40e2cae0ae7be54b, processorArchitecture=MSIL">
-      <HintPath>packages\WATS.Client.6.1.91\lib\net472\Virinco.WATS.WATS-Core.dll</HintPath>
+    <Reference Include="Virinco.WATS.WATS-Core, Version=6.1.0.101, Culture=neutral, PublicKeyToken=40e2cae0ae7be54b, processorArchitecture=MSIL">
+      <HintPath>packages\WATS.Client.6.1.101\lib\net472\Virinco.WATS.WATS-Core.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>

@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
+using System.Text.RegularExpressions;
 using Virinco.WATS.Integration.TextConverter;
 using Virinco.WATS.Interface;
 
@@ -12,7 +14,7 @@ namespace ICTKeysight3070Converter
     {
         public ICTKeysight3070Importer() : base()
         {
-
+            ConverterParameters.Add("numberFormatMode", "prefix");
         }
 
         public void CleanUp()
@@ -47,12 +49,13 @@ namespace ICTKeysight3070Converter
         string group = "";
         string compRef = "";
         string reportText = "";
+        UUTStatusType endStatus = UUTStatusType.Passed;
 
         NumericLimitStep multiNumericStep = null;
 
         protected override bool ProcessMatchedLine(SearchFields.SearchMatch match, ref ReportReadState readState)
         {
-            apiRef.TestMode = TestModeType.Import;
+            //apiRef.TestMode = TestModeType.Import;
             if (match == null)
             {
                 if (!string.IsNullOrEmpty(currentUUT.SerialNumber))
@@ -68,7 +71,10 @@ namespace ICTKeysight3070Converter
                     }
                     currentUUT.OperationType = apiRef.GetOperationType(ConverterParameters["operationTypeCode"]);
 
-                    apiRef.Submit(SubmitMethod.Online, currentUUT);
+                    // override status at the end because we dont use TestModeType.Import
+                    currentUUT.Status = endStatus;
+
+                    apiRef.Submit(currentUUT);
                     group = "";
                     compRef = "";
                     reportText = "";
@@ -84,7 +90,7 @@ namespace ICTKeysight3070Converter
                     {
                         currentUUT.SerialNumber = (string)match.GetSubField("SerialNumber");
                         currentUUT.StartDateTime = (DateTime)match.GetSubField("StartDate");
-                        currentUUT.Status = GetUUTStatusType((string)match.GetSubField("Status"));
+                        endStatus = GetUUTStatusType((string)match.GetSubField("Status"));
                         currentUUT.ExecutionTime = (double)match.GetSubField("ExecutionTime");
                         multiNumericStep = null;
                         break;
@@ -93,7 +99,20 @@ namespace ICTKeysight3070Converter
                 case "BLOCK":
                     {
                         string BlockDesignator = (string)match.GetSubField("BlockDesignator");
-                        compRef = BlockDesignator.Replace("%", " ");
+                        string[] BlockDesignatorParts = BlockDesignator.Split('%');
+
+                        if (Regex.IsMatch(BlockDesignator, @"^\d+%"))
+                        {
+                            string socketIndex = BlockDesignatorParts[0];
+                            currentUUT.TestSocketIndex = short.Parse(socketIndex);
+
+                            compRef = string.Join(" ", BlockDesignatorParts.Skip(1));
+                        }
+                        else
+                        {
+                            compRef = string.Join(" ", BlockDesignatorParts);
+                        }
+
                         multiNumericStep = null;
                         reportText = "";
                         break;
@@ -105,11 +124,25 @@ namespace ICTKeysight3070Converter
                         {
                             group = (string)match.GetSubField("Group");
                             currentSequence = currentUUT.GetRootSequenceCall().AddSequenceCall(group);
+
                         }
-                        (double multiplier, string unit) = UnitMapper.GetMultiplierAndUnitHardcoded(group, (double)match.GetSubField("Meas"));
+
+
+
+                        double multiplier = 1;
+                        string unit = "";
+                        if (ConverterParameters["numberFormatMode"] == "prefix")
+                        {
+                            (multiplier, unit) = UnitMapper.GetMultiplierAndUnitDynamicallyBasedOnNumberSize(group, (double)match.GetSubField("LowLim"));
+                        }
+                        else
+                        {
+                            (multiplier, unit) = UnitMapper.GetMultiplierAndUnitHardcoded(group);
+                        }
+
+
                         NumericLimitStep currentStep = currentSequence.AddNumericLimitStep(compRef);
-                        NumericLimitTest currentTest = currentStep.AddTest((double)match.GetSubField("Meas") * multiplier, CompOperatorType.GELE, (double)match.GetSubField("LowLim") * multiplier, (double)match.GetSubField("HighLim") * multiplier, unit);
-                        currentStep.Status = GetStepStatusType((string)match.GetSubField("Status"));
+                        NumericLimitTest currentTest = currentStep.AddTest((double)match.GetSubField("Meas") * multiplier, CompOperatorType.GELE, (double)match.GetSubField("LowLim") * multiplier, (double)match.GetSubField("HighLim") * multiplier, unit, GetStepStatusType((string)match.GetSubField("Status")));
                         multiNumericStep = null;
                         break;
                     }
@@ -119,24 +152,60 @@ namespace ICTKeysight3070Converter
                         {
                             group = (string)match.GetSubField("Group");
                             currentSequence = currentUUT.GetRootSequenceCall().AddSequenceCall(group);
+                            multiNumericStep = null;
                         }
                         if (multiNumericStep == null)
                         {
                             multiNumericStep = currentSequence.AddNumericLimitStep(compRef);
                         }
-                        (double multiplier, string unit) = UnitMapper.GetMultiplierAndUnitHardcoded(group, (double)match.GetSubField("Meas"));
-                        NumericLimitTest currentTest = multiNumericStep.AddMultipleTest((double)match.GetSubField("Meas") * multiplier, CompOperatorType.GELE, (double)match.GetSubField("LowLim") * multiplier, (double)match.GetSubField("HighLim") * multiplier, unit, (string)match.GetSubField("MeasName"));
-                        currentTest.MeasureStatus = GetStepStatusType((string)match.GetSubField("Status"));
+
+                        double multiplier = 1;
+                        string unit = "";
+                        if (ConverterParameters["numberFormatMode"] == "prefix")
+                        {
+                            (multiplier, unit) = UnitMapper.GetMultiplierAndUnitDynamicallyBasedOnNumberSize(group, (double)match.GetSubField("LowLim"));
+                        } else
+                        {
+                            (multiplier, unit) = UnitMapper.GetMultiplierAndUnitHardcoded(group);
+                        }
+
+                       
+                        NumericLimitTest currentTest = multiNumericStep.AddMultipleTest((double)match.GetSubField("Meas") * multiplier, CompOperatorType.GELE, (double)match.GetSubField("LowLim") * multiplier, (double)match.GetSubField("HighLim") * multiplier, unit, (string)match.GetSubField("MeasName"), GetStepStatusType((string)match.GetSubField("Status")));
                         break;
                     }
-                case "TestPassFail":
+                case "BS-CON":
                     {
                         if ((string)match.GetSubField("Group") != group)
                         {
                             group = (string)match.GetSubField("Group");
                             currentSequence = currentUUT.GetRootSequenceCall().AddSequenceCall(group);
                         }
-                        PassFailTest currentTest = currentSequence.AddPassFailStep((string)match.GetSubField("CompRef")).AddTest((double)match.GetSubField("Res1") == 0);
+
+                        var testNameString = (string)match.GetSubField("testName");
+                        string[] testNameParts = testNameString.Split('%');
+                        string testName;
+
+                        if (Regex.IsMatch(testNameString, @"^\d+%"))
+                        {
+                            string socketIndex = testNameParts[0];
+                            currentUUT.TestSocketIndex = short.Parse(socketIndex);
+
+                            testName = string.Join(" ", testNameParts.Skip(1));
+                        }
+                        else
+                        {
+                            testName = string.Join(" ", testNameParts);
+                        }
+
+                        NumericLimitStep currentStep = currentSequence.AddNumericLimitStep(testName);
+                        currentStep.AddMultipleTest((int)match.GetSubField("shortCount"), "", "Shorts count");
+                        currentStep.AddMultipleTest((int)match.GetSubField("opensCount"), "", "Opens count");
+                        int status;
+                        if (Int32.TryParse((string)match.GetSubField("status"), NumberStyles.Any, CultureInfo.InvariantCulture, out status))
+                        {
+                            currentStep.AddMultipleTest(status, "", "Test status", GetStepStatusType((string)match.GetSubField("status")));
+                        }
+
                         multiNumericStep = null;
                         break;
                     }
@@ -159,16 +228,33 @@ namespace ICTKeysight3070Converter
                             group = (string)match.GetSubField("Group");
                             currentSequence = currentUUT.GetRootSequenceCall().AddSequenceCall(group);
                         }
-                        string stepName = (string)match.GetSubField("TestName");
-                        NumericLimitStep currentStep = currentSequence.AddNumericLimitStep(stepName.Replace("%", " "));
-                        currentStep.AddMultipleTest((int)match.GetSubField("PinCount"), "", "pin count");
-                        currentStep.AddMultipleTest((int)match.GetSubField("TestSubstatus"), "", "failing vector number");
+
+                        var testNameString = (string)match.GetSubField("TestName");
+                        string[] testNameParts = testNameString.Split('%');
+                        string testName;
+
+                        if (Regex.IsMatch(testNameString, @"^\d+%"))
+                        {
+                            string socketIndex = testNameParts[0];
+                            currentUUT.TestSocketIndex = short.Parse(socketIndex);
+
+                            testName = string.Join(" ", testNameParts.Skip(1));
+                        }
+                        else
+                        {
+                            testName = string.Join(" ", testNameParts);
+                        }
+
+                        NumericLimitStep currentStep = currentSequence.AddNumericLimitStep(testName);
+                        currentStep.AddMultipleTest((int)match.GetSubField("PinCount"), "", "Pin count");
+                        currentStep.AddMultipleTest((int)match.GetSubField("TestSubstatus"), "", "Test substans");
+                        currentStep.AddMultipleTest((int)match.GetSubField("FailingVectorNumber"), "", "Failing vector number");
                         int status;
                         if (Int32.TryParse((string)match.GetSubField("TestStatus"), NumberStyles.Any, CultureInfo.InvariantCulture, out status))
                         {
-                            currentStep.AddMultipleTest(status, "", "test status");
+                            currentStep.AddMultipleTest(status, "", "Test status", GetStepStatusType((string)match.GetSubField("TestStatus")));
                         }
-                        currentStep.Status = GetStepStatusType((string)match.GetSubField("TestStatus"));
+
                         multiNumericStep = null;
                         break;
                     }
@@ -179,15 +265,30 @@ namespace ICTKeysight3070Converter
                             group = (string)match.GetSubField("Group");
                             currentSequence = currentUUT.GetRootSequenceCall().AddSequenceCall(group);
                         }
-                        string stepName = (string)match.GetSubField("TestName");
-                        NumericLimitStep currentStep = currentSequence.AddNumericLimitStep(stepName.Replace("%", " "));
-                        currentStep.AddMultipleTest((int)match.GetSubField("PinCount"), "", "pin count");
+
+                        var testNameString = (string)match.GetSubField("TestName");
+                        string[] testNameParts = testNameString.Split('%');
+                        string testName;
+
+                        if (Regex.IsMatch(testNameString, @"^\d+%"))
+                        {
+                            string socketIndex = testNameParts[0];
+                            currentUUT.TestSocketIndex = short.Parse(socketIndex);
+
+                            testName = string.Join(" ", testNameParts.Skip(1));
+                        }
+                        else
+                        {
+                            testName = string.Join(" ", testNameParts);
+                        }
+
+                        NumericLimitStep currentStep = currentSequence.AddNumericLimitStep(testName);
+                        currentStep.AddMultipleTest((int)match.GetSubField("PinCount"), "", "Pin count");
                         int status;
                         if (Int32.TryParse((string)match.GetSubField("TestStatus"), NumberStyles.Any, CultureInfo.InvariantCulture, out status))
                         {
-                            currentStep.AddMultipleTest(status, "", "test status");
+                            currentStep.AddMultipleTest(status, "", "Test status", GetStepStatusType((string)match.GetSubField("TestStatus")));
                         }
-                        currentStep.Status = GetStepStatusType((string)match.GetSubField("TestStatus"));
                         multiNumericStep = null;
                         break;
                     }
@@ -198,18 +299,31 @@ namespace ICTKeysight3070Converter
                             group = (string)match.GetSubField("Group");
                             currentSequence = currentUUT.GetRootSequenceCall().AddSequenceCall(group);
                         }
-                        string stepName = (string)match.GetSubField("TestName");
+                        var testNameString = (string)match.GetSubField("TestName");
+                        string[] testNameParts = testNameString.Split('%');
+                        string testName;
 
-                        NumericLimitStep currentStep = currentSequence.AddNumericLimitStep(stepName.Replace("%", " "));
-                        currentStep.AddMultipleTest((int)match.GetSubField("PinCount"), "", "pin count");
+                        if (Regex.IsMatch(testNameString, @"^\d+%"))
+                        {
+                            string socketIndex = testNameParts[0];
+                            currentUUT.TestSocketIndex = short.Parse(socketIndex);
+
+                            testName = string.Join(" ", testNameParts.Skip(1));
+                        }
+                        else
+                        {
+                            testName = string.Join(" ", testNameParts);
+                        }
+
+                        NumericLimitStep currentStep = currentSequence.AddNumericLimitStep(testName);
+                        currentStep.AddMultipleTest((int)match.GetSubField("totalPins"), "", "Total pins");
 
                         int status;
                         if (Int32.TryParse((string)match.GetSubField("TestStatus"), NumberStyles.Any, CultureInfo.InvariantCulture, out status))
                         {
-                            currentStep.AddMultipleTest(status, "", "test status");
+                            currentStep.AddMultipleTest(status, "", "Test status", GetStepStatusType((string)match.GetSubField("TestStatus")));
                         }
 
-                        currentStep.Status = GetStepStatusType((string)match.GetSubField("TestStatus"));
                         multiNumericStep = null;
                         break;
                     }
@@ -220,17 +334,32 @@ namespace ICTKeysight3070Converter
                             group = (string)match.GetSubField("Group");
                             currentSequence = currentUUT.GetRootSequenceCall().AddSequenceCall(group);
                         }
-                        string stepName = (string)match.GetSubField("TestName");
-                        NumericLimitStep currentStep = currentSequence.AddNumericLimitStep(stepName.Replace("%", " "));
-                        currentStep.AddMultipleTest((int)match.GetSubField("ShortsCount"), "", "shorts count");
-                        currentStep.AddMultipleTest((int)match.GetSubField("OpensCount"), "", "opens count");
-                        currentStep.AddMultipleTest((int)match.GetSubField("PhantomsCount"), "", "phantoms count");
+
+                        var testNameString = (string)match.GetSubField("TestName");
+                        string[] testNameParts = testNameString.Split('%');
+                        string testName;
+
+                        if (Regex.IsMatch(testNameString, @"^\d+%"))
+                        {
+                            string socketIndex = testNameParts[0];
+                            currentUUT.TestSocketIndex = short.Parse(socketIndex);
+
+                            testName = string.Join(" ", testNameParts.Skip(1));
+                        }
+                        else
+                        {
+                            testName = string.Join(" ", testNameParts);
+                        }
+
+                        NumericLimitStep currentStep = currentSequence.AddNumericLimitStep(testName);
+                        currentStep.AddMultipleTest((int)match.GetSubField("ShortsCount"), "", "Shorts count");
+                        currentStep.AddMultipleTest((int)match.GetSubField("OpensCount"), "", "Opens count");
+                        currentStep.AddMultipleTest((int)match.GetSubField("PhantomsCount"), "", "Phantoms count");
                         int status;
                         if (Int32.TryParse((string)match.GetSubField("TestStatus"), NumberStyles.Any, CultureInfo.InvariantCulture, out status))
                         {
-                            currentStep.AddMultipleTest(status, "", "test status");
+                            currentStep.AddMultipleTest(status, "", "Test status", GetStepStatusType((string)match.GetSubField("TestStatus")));
                         }
-                        currentStep.Status = GetStepStatusType((string)match.GetSubField("TestStatus"));
                         multiNumericStep = null;
                         break;
                     }
@@ -271,7 +400,7 @@ namespace ICTKeysight3070Converter
 
             // Format: {@group name|test status (int)|measured value (float)|{@LIM2|high limit (float)|low limit (float)}}
             // Matches these group names: @A-RES, @A-MEA, @A-NFE, @A-NPN, @A-PFE, @A-PNP, @A-SWI, @A-DIO, @A-JUM
-            regExpSearchField = searchFields.AddRegExpField("TestLIM2", ReportReadState.InTest, @"{@(?<Group>[^|]+)[^|]*[|](?<Status>[^|]*)[|](?<Meas>[0-9+-E.]+){@LIM2[|](?<HighLim>[0-9+-E.]+)[|](?<LowLim>[0-9+-E.]+)}}", null, typeof(string));
+            regExpSearchField = searchFields.AddRegExpField("TestLIM2", ReportReadState.InTest, @"{@(?<Group>[^|]+)[|](?<Status>[^|]*)[|]\s*(?<Meas>[0-9+-E.]+)[|]*{@LIM2[|]\s*(?<HighLim>[0-9+-E.]+)[|]\s*(?<LowLim>[0-9+-E.]+)}", null, typeof(string));
             regExpSearchField.AddSubField("Group", typeof(string), null);
             regExpSearchField.AddSubField("Status", typeof(string), null);
             regExpSearchField.AddSubField("Meas", typeof(double), null);
@@ -280,7 +409,7 @@ namespace ICTKeysight3070Converter
 
             // Format: {@group name|test status (int)|measured value (float)|measurment name (sting){@LIM2|high limit (float)|low limit (float)}}
             // Matches these group names: @A-RES, @A-MEA, @A-NFE, @A-NPN, @A-PFE, @A-PNP, @A-SWI, @A-DIO, @A-JUM
-            regExpSearchField = searchFields.AddRegExpField("TestLIM2Multi", ReportReadState.InTest, @"{@(?<Group>[^|]+)[|](?<Status>[^|]*)[|](?<Meas>[0-9+-E.]+)[|](?<MeasName>[^}]+){@LIM2[|](?<HighLim>[0-9+-E.]+)[|](?<LowLim>[0-9+-E.]+)}}", null, typeof(string));
+            regExpSearchField = searchFields.AddRegExpField("TestLIM2Multi", ReportReadState.InTest, @"{@(?<Group>[^|]+)[|](?<Status>[^|]*)[|]\s*(?<Meas>[0-9+-E.]+)[|](?<MeasName>[^}]+)[|]*{@LIM2[|]\s*(?<HighLim>[0-9+-E.]+)[|]\s*(?<LowLim>[0-9+-E.]+)}}", null, typeof(string));
             regExpSearchField.AddSubField("Group", typeof(string), null);
             regExpSearchField.AddSubField("Status", typeof(string), null);
             regExpSearchField.AddSubField("Meas", typeof(double), null);
@@ -290,7 +419,7 @@ namespace ICTKeysight3070Converter
 
             // Format: {@group name|test status (int)|measured value (float)|{@LIM3|nominal value (float)|high limit (float)|minus tolerance (float)}}
             // Matches these group names: @A-RES, @A-ZEN, @A-CAP, @A-FUS, @A-IND, @A-POT
-            regExpSearchField = searchFields.AddRegExpField("TestLIM3", ReportReadState.InTest, @"{@(?<Group>[^|]+)[^|]*[|](?<Status>[^|]*)[|](?<Meas>[0-9+-E.]+){@LIM3[|](?<Nominal>[0-9+-E.]+)[|](?<HighLim>[0-9+-E.]+)[|](?<LowLim>[0-9+-E.]+)}}", null, typeof(string));
+            regExpSearchField = searchFields.AddRegExpField("TestLIM3", ReportReadState.InTest, @"{@(?<Group>[^|]+)[^|]*[|](?<Status>[^|]*)[|](?<Meas>[0-9+-E.]+)[|]*{@LIM3[|](?<Nominal>[0-9+-E.]+)[|](?<HighLim>[0-9+-E.]+)[|](?<LowLim>[0-9+-E.]+)}}", null, typeof(string));
             regExpSearchField.AddSubField("Group", typeof(string), null);
             regExpSearchField.AddSubField("Status", typeof(string), null);
             regExpSearchField.AddSubField("Meas", typeof(double), null);
@@ -299,12 +428,12 @@ namespace ICTKeysight3070Converter
             regExpSearchField.AddSubField("LowLim", typeof(double), null);
 
             // Format: {@BS-CON|test designator (string)|status (int)|shorts count (int)|opens count (int)}
-            regExpSearchField = searchFields.AddRegExpField("TestPassFail", ReportReadState.InTest, @"{@(?<Group>[^|]+)[|](?<Nest>.*)%(?<CompRef>[^|]*)[|](?<Res1>\d+)[|](?<Res2>\d+)[|](?<Res3>\d+)}", null, typeof(string));
+            regExpSearchField = searchFields.AddRegExpField("BS-CON", ReportReadState.InTest, @"{@(?<Group>BS-CON)[|](?<testName>.*)[|](?<status>[^|]*)[|](?<shortCount>\d+)[|](?<opensCount>\d+)", null, typeof(string));
             regExpSearchField.AddSubField("Group", typeof(string), null);
-            regExpSearchField.AddSubField("CompRef", typeof(string), null);
-            regExpSearchField.AddSubField("Res1", typeof(double), null);
-            regExpSearchField.AddSubField("Res2", typeof(double), null);
-            regExpSearchField.AddSubField("Res3", typeof(double), null);
+            regExpSearchField.AddSubField("testName", typeof(string), null);
+            regExpSearchField.AddSubField("status", typeof(string), null);
+            regExpSearchField.AddSubField("shortCount", typeof(int), null);
+            regExpSearchField.AddSubField("opensCount", typeof(int), null);
 
             // Format: {@RPT|message (string)}
             regExpSearchField = searchFields.AddRegExpField("Report", ReportReadState.InTest, @"{@RPT[|](?<RepTxt>.*)}", null, typeof(string));
@@ -315,6 +444,7 @@ namespace ICTKeysight3070Converter
             regExpSearchField.AddSubField("Group", typeof(string), null);
             regExpSearchField.AddSubField("TestStatus", typeof(string), null);
             regExpSearchField.AddSubField("TestSubstatus", typeof(int), null);
+            regExpSearchField.AddSubField("FailingVectorNumber", typeof(int), null);
             regExpSearchField.AddSubField("PinCount", typeof(int), null);
             regExpSearchField.AddSubField("TestName", typeof(string), null);
 
@@ -326,10 +456,10 @@ namespace ICTKeysight3070Converter
             regExpSearchField.AddSubField("TestName", typeof(string), null);
 
             // Format: {@PF|designator (string)|test status (int)|total pins (int)}
-            regExpSearchField = searchFields.AddRegExpField("PF", ReportReadState.InTest, @"\{@(?<Group>PF)\|(?<TestName>(.*))\|(?<PinCount>([0-9]*))\|((?<TestStatus>(0|1)))", null, typeof(string));
+            regExpSearchField = searchFields.AddRegExpField("PF", ReportReadState.InTest, @"\{@(?<Group>PF)\|(?<TestName>(.*))\|(?<TestStatus>(0|1))\|((?<totalPins>([0-9]*)))", null, typeof(string));
             regExpSearchField.AddSubField("Group", typeof(string), null);
+            regExpSearchField.AddSubField("totalPins", typeof(int), null);
             regExpSearchField.AddSubField("TestStatus", typeof(string), null);
-            regExpSearchField.AddSubField("PinCount", typeof(int), null);
             regExpSearchField.AddSubField("TestName", typeof(string), null);
 
             // Format: {@TS|test status (int)|shorts count (int)|opens count (int)|phantoms count (int)|designator (string)}

@@ -13,15 +13,19 @@ This converter does not support WATS Client 5.1 or older, because that version u
 
 ## Download
 
-You can download the latest released version of the converter [here](https://github.com/Virinco/TestStand-XML-Converter/releases/latest). See the Custom Converter section in the [WATS Client Installation Guide](https://wats.com/download) for your version of the WATS Client for how to install a converter.
+You can download the latest released version of the converter here). See the Custom Converter section in the [WATS Client Installation Guide](https://wats.com/download) for your version of the WATS Client for how to install a converter.
 
 ### Parameters
 
 This converter uses the following parameters:
 
-| Parameter         | Default value | Description                                                    |
-|-------------------|---------------|----------------------------------------------------------------|
-| operationTypeCode | 10            | Update to the valid operationTypeCode for your application.    |
+| Parameter         | Default value    | Description                                                                    |
+|-------------------|------------------|--------------------------------------------------------------------------------|
+| numberFormatMode  | prefix           | Converts the number size and adds a scientific prefix for improved readability.|
+| operationTypeCode | 10               | Update to the valid operationTypeCode for your application.                    |
+| operator          | sysoper          | Log has no operator, converter uses this one.                                  |
+| fileEncoding      | 1252             | File encoding of the file to import.                                           |
+| validationMode    | ThrowExceptions  | ThrowExceptions or AutoTruncate.                                               |
 
 
 ## Testing
