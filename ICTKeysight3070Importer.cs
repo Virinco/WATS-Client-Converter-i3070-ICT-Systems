@@ -211,11 +211,16 @@ namespace ICTKeysight3070Converter
                     }
                 case "Report":
                     {
-                        if (!string.IsNullOrEmpty((string)match.GetSubField("RepTxt")))
+                        string repTxt = (string)match.GetSubField("RepTxt");
+                        if (!string.IsNullOrEmpty(repTxt))
                         {
-                            if (reportText.Length + ((string)match.GetSubField("RepTxt")).Length > 5000)
+                            if (reportText.Length + repTxt.Length > 5000)
                             {
-                                reportText += ((string)match.GetSubField("RepTxt")).Substring(0, 5000 - reportText.Length);
+                                reportText += repTxt.Substring(0, 5000 - reportText.Length);
+                            }
+                            else
+                            {
+                                reportText += repTxt;
                             }
                         }
                         multiNumericStep = null;
